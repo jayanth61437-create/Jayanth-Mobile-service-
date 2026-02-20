@@ -632,10 +632,33 @@ let repView     = 'daily';
 let isPrivate   = false;
 
 function saveDB() {
+    // ನಿಮ್ಮ ಫೋನ್‌ನಲ್ಲಿ ಸೇವ್ ಮಾಡಲು
     localStorage.setItem('jay_v36_bills',    JSON.stringify(db.bills));
     localStorage.setItem('jay_v36_stocks',   JSON.stringify(db.stocks));
     localStorage.setItem('jay_v36_expenses', JSON.stringify(db.expenses));
     localStorage.setItem('jay_v37_repairs',  JSON.stringify(db.repairs||[]));
+
+    // ಆನ್‌ಲೈನ್ ಗೂಗಲ್ ಶೀಟ್‌ಗೆ ಕಳುಹಿಸಲು
+    syncToOnline();
+}
+
+// ಆನ್‌ಲೈನ್ ಸಿಂಕ್ ಫಂಕ್ಷನ್
+function syncToOnline() {
+    const scriptURL = 'https://script.google.com/macros/s/AKfycbz-5KamfaKv8ZKNgQVhgnT5yWtius_xYByvMqZ1IG6GKxRU7pn5ULLFp2kX4MpdcBho/exec';
+
+    // ಕೇವಲ ಹೊಸ ಬಿಲ್ ಡೇಟಾ ಮಾತ್ರ ಕಳುಹಿಸಲು
+    const lastBill = db.bills[db.bills.length - 1];
+
+    if (lastBill) {
+        fetch(scriptURL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(lastBill)
+        })
+        .then(() => console.log('Data synced online!'))
+        .catch(error => console.error('Sync failed!', error));
+    }
 }
 
 // ===================== NAV =====================
