@@ -644,7 +644,7 @@ function saveDB() {
 
 // ಆನ್‌ಲೈನ್ ಸಿಂಕ್ ಫಂಕ್ಷನ್
 function syncToOnline() {
-    const scriptURL = 'https://script.google.com/macros/s/AKfycbz-5KamfaKv8ZKNgQVhgnT5yWtius_xYByvMqZ1IG6GKxRU7pn5ULLFp2kX4MpdcBho/exec';
+    const scriptURL = 'https://script.google.com/macros/s/AKfycbx4m2h0dHDNU8O1uALG9atZ6alXBCAKvOW1WLYeGB59asv7xYR52M2Zv_7NPiQqzkwZ/exec';
 
     // ಕೇವಲ ಹೊಸ ಬಿಲ್ ಡೇಟಾ ಮಾತ್ರ ಕಳುಹಿಸಲು
     const lastBill = db.bills[db.bills.length - 1];
