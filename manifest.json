@@ -1,0 +1,24 @@
+{
+  "name": "Jayanth Mobile Service",
+  "short_name": "Jayanth Mobile",
+  "description": "Jayanth Mobile Service - Billing, Stock, Repairs Manager",
+  "start_url": "/Jayanth-Mobile-service-/",
+  "display": "standalone",
+  "background_color": "#0a0a0c",
+  "theme_color": "#00e5ff",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192x192/00e5ff/0a0a0c?text=JM",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://via.placeholder.com/512x512/00e5ff/0a0a0c?text=JM",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
