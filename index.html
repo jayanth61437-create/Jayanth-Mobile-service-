@@ -45,6 +45,7 @@
         }
         header h1 { margin: 0; font-size: 17px; color: var(--primary); font-weight: 800; letter-spacing: 1.5px; }
         header small { display: block; color: var(--text-dim); font-size: 10px; font-weight: 400; letter-spacing: 2px; }
+        #firebaseStatus { font-size: 10px; color: #ffc400; margin-top: 1px; }
         .header-actions { display: flex; gap: 10px; align-items: center; }
         .icon-btn { background: none; border: none; cursor: pointer; width: auto; padding: 5px; display: flex; align-items: center; justify-content: center; }
         .icon-btn i { font-size: 22px; color: var(--text-dim); }
@@ -256,6 +257,7 @@
     <div>
         <h1 id="headTitle">JAYANTH MOBILE</h1>
         <small>V38 ELITE PRO</small>
+        <div id="firebaseStatus">☁️ Firebase: Connecting...</div>
         <small style="color:var(--text-dim);font-size:9px;letter-spacing:0.5px;">📍 Arsikere, Hassan Dist, Karnataka</small>
     </div>
     <div class="header-actions">
@@ -632,6 +634,53 @@
 
 <div id="printSection"></div>
 
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDvvB7S1_1pdQ6tycHDmI0FQMoIpefsBFk",
+    authDomain: "jayanth-mobile-service.firebaseapp.com",
+    databaseURL: "https://jayanth-mobile-service-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "jayanth-mobile-service",
+    storageBucket: "jayanth-mobile-service.firebasestorage.app",
+    messagingSenderId: "319622451285",
+    appId: "1:319622451285:web:f95b6383ba717c885f04dc",
+    measurementId: "G-N0H7FW45E7"
+  };
+
+  const firebaseApp = initializeApp(firebaseConfig);
+  const firebaseDB  = getDatabase(firebaseApp);
+
+  // Make saveDB and loadDB available globally
+  window._firebaseDB = firebaseDB;
+  window._firebaseRef = ref;
+  window._firebaseSet = set;
+  window._firebaseGet = get;
+  window._firebaseOnValue = onValue;
+
+  // Load data from Firebase on startup
+  const shopRef = ref(firebaseDB, 'jayanth_mobile');
+  onValue(shopRef, (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+      if (data.bills)    db.bills    = data.bills;
+      if (data.stocks)   db.stocks   = data.stocks;
+      if (data.expenses) db.expenses = data.expenses;
+      if (data.repairs)  db.repairs  = data.repairs;
+      if (data.shopName)   { shopName = data.shopName; localStorage.setItem('jay_shop', shopName); }
+      if (data.googleLink) { googleLink = data.googleLink; localStorage.setItem('jay_glink', googleLink); }
+    }
+    updateDashboard();
+    document.getElementById('firebaseStatus').innerText = '☁️ Firebase: Connected ✅';
+    document.getElementById('firebaseStatus').style.color = '#69ff47';
+  }, (error) => {
+    document.getElementById('firebaseStatus').innerText = '☁️ Firebase: Offline ❌';
+    document.getElementById('firebaseStatus').style.color = '#ff1744';
+  });
+</script>
+
 <script>
 // ===================== DATABASE =====================
 let db = {
@@ -652,11 +701,36 @@ let histFilter  = 'all';
 let repView     = 'daily';
 let isPrivate   = false;
 
+let _saveTimeout = null;
 function saveDB() {
+    // Save to localStorage (backup)
     localStorage.setItem('jay_v36_bills',    JSON.stringify(db.bills));
     localStorage.setItem('jay_v36_stocks',   JSON.stringify(db.stocks));
     localStorage.setItem('jay_v36_expenses', JSON.stringify(db.expenses));
     localStorage.setItem('jay_v37_repairs',  JSON.stringify(db.repairs||[]));
+
+    // Save to Firebase (debounced 1 second)
+    clearTimeout(_saveTimeout);
+    _saveTimeout = setTimeout(() => {
+        if(window._firebaseDB && window._firebaseRef && window._firebaseSet) {
+            const dbRef = window._firebaseRef(window._firebaseDB, 'jayanth_mobile');
+            window._firebaseSet(dbRef, {
+                bills:     db.bills,
+                stocks:    db.stocks,
+                expenses:  db.expenses,
+                repairs:   db.repairs || [],
+                shopName:  shopName,
+                googleLink: googleLink,
+                lastSaved: new Date().toLocaleString('en-IN')
+            }).then(() => {
+                document.getElementById('firebaseStatus').innerText = '☁️ Firebase: Saved ✅';
+                document.getElementById('firebaseStatus').style.color = '#69ff47';
+            }).catch(() => {
+                document.getElementById('firebaseStatus').innerText = '☁️ Firebase: Save Failed ❌';
+                document.getElementById('firebaseStatus').style.color = '#ff1744';
+            });
+        }
+    }, 1000);
 }
 
 // ===================== NAV =====================
