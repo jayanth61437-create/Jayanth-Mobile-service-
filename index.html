@@ -291,20 +291,24 @@
             <div class="val blur" id="statSales" style="color:var(--primary)">₹ 0</div>
         </div>
         <div class="stat-box" style="border-left-color:var(--accent);">
-            <small>Monthly Profit</small>
-            <div class="val blur" id="statProfit" style="color:var(--accent)">₹ 0</div>
+            <small>Today Profit</small>
+            <div class="val blur" id="statTodayProfit" style="color:var(--accent)">₹ 0</div>
         </div>
-        <div class="stat-box" style="border-left-color:var(--danger);">
-            <small>Pending Dues</small>
-            <div class="val blur" id="statDues" style="color:var(--danger)">₹ 0</div>
+        <div class="stat-box" style="border-left-color:var(--primary);">
+            <small>Weekly Sales</small>
+            <div class="val blur" id="statWeeklySales" style="color:var(--primary)">₹ 0</div>
         </div>
-        <div class="stat-box" style="border-left-color:var(--warn);">
-            <small>Monthly Expenses</small>
-            <div class="val blur" id="statExpenses" style="color:var(--text-dim)">₹ 0</div>
+        <div class="stat-box" style="border-left-color:var(--accent);">
+            <small>Weekly Profit</small>
+            <div class="val blur" id="statWeeklyProfit" style="color:var(--accent)">₹ 0</div>
         </div>
         <div class="stat-box" style="border-left-color:var(--purple);">
-            <small>Pending Jobs</small>
-            <div class="val blur" id="statPending" style="color:var(--purple)">0</div>
+            <small>Monthly Sales</small>
+            <div class="val blur" id="statMonthlySales" style="color:var(--purple)">₹ 0</div>
+        </div>
+        <div class="stat-box" style="border-left-color:var(--warn);">
+            <small>Monthly Profit</small>
+            <div class="val blur" id="statProfit" style="color:var(--warn)">₹ 0</div>
         </div>
     </div>
 
@@ -856,21 +860,30 @@ function togglePrivacy() {
 // ===================== DASHBOARD =====================
 function updateDashboard() {
     const today = new Date().toISOString().slice(0,10);
-    const m = new Date().getMonth(), y = new Date().getFullYear();
+    const now   = new Date();
+    const m = now.getMonth(), y = now.getFullYear();
 
-    const todaySales = db.bills.filter(b => b.dateOnly === today && !b.isDue).reduce((s,b) => s+b.sell, 0);
-    const mProfit = db.bills.filter(b => { const d=new Date(b.dateOnly); return d.getMonth()===m && d.getFullYear()===y && !b.isDue; }).reduce((s,b) => s+(b.sell-b.cost), 0);
-    const mExp    = db.expenses.filter(e => { if(!e.date) return false; const d=new Date(e.date); return d.getMonth()===m && d.getFullYear()===y; }).reduce((s,e) => s+e.amt, 0);
-    const dues    = db.bills.filter(b => b.isDue && b.dueAmount > 0).reduce((s,b) => s+b.dueAmount, 0);
-    const stockVal= db.stocks.reduce((s,x) => s+(x.buy*x.qty), 0);
+    // Week start (Monday)
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - ((now.getDay()+6)%7));
+    weekStart.setHours(0,0,0,0);
 
-    document.getElementById('statStock').innerText    = '₹ ' + stockVal.toLocaleString();
-    document.getElementById('statSales').innerText    = '₹ ' + todaySales.toLocaleString();
-    document.getElementById('statProfit').innerText   = '₹ ' + (mProfit-mExp).toLocaleString();
-    document.getElementById('statDues').innerText     = '₹ ' + dues.toLocaleString();
-    document.getElementById('statExpenses').innerText = '₹ ' + mExp.toLocaleString();
-    const pendingJobs = db.bills.filter(b => b.status === 'Pending').length;
-    document.getElementById('statPending').innerText  = pendingJobs;
+    const todaySales    = db.bills.filter(b => b.dateOnly===today && !b.isDue).reduce((s,b)=>s+b.sell,0);
+    const todayProfit   = db.bills.filter(b => b.dateOnly===today && !b.isDue).reduce((s,b)=>s+(b.sell-b.cost),0);
+    const weeklySales   = db.bills.filter(b => { const d=new Date(b.dateOnly); return d>=weekStart && !b.isDue; }).reduce((s,b)=>s+b.sell,0);
+    const weeklyProfit  = db.bills.filter(b => { const d=new Date(b.dateOnly); return d>=weekStart && !b.isDue; }).reduce((s,b)=>s+(b.sell-b.cost),0);
+    const monthlySales  = db.bills.filter(b => { const d=new Date(b.dateOnly); return d.getMonth()===m && d.getFullYear()===y && !b.isDue; }).reduce((s,b)=>s+b.sell,0);
+    const mProfit       = db.bills.filter(b => { const d=new Date(b.dateOnly); return d.getMonth()===m && d.getFullYear()===y && !b.isDue; }).reduce((s,b)=>s+(b.sell-b.cost),0);
+    const mExp          = db.expenses.filter(e => { if(!e.date) return false; const d=new Date(e.date); return d.getMonth()===m && d.getFullYear()===y; }).reduce((s,e)=>s+e.amt,0);
+    const stockVal      = db.stocks.reduce((s,x)=>s+(x.buy*x.qty),0);
+
+    document.getElementById('statStock').innerText        = '₹ ' + stockVal.toLocaleString();
+    document.getElementById('statSales').innerText        = '₹ ' + todaySales.toLocaleString();
+    document.getElementById('statTodayProfit').innerText  = '₹ ' + todayProfit.toLocaleString();
+    document.getElementById('statWeeklySales').innerText  = '₹ ' + weeklySales.toLocaleString();
+    document.getElementById('statWeeklyProfit').innerText = '₹ ' + weeklyProfit.toLocaleString();
+    document.getElementById('statMonthlySales').innerText = '₹ ' + monthlySales.toLocaleString();
+    document.getElementById('statProfit').innerText       = '₹ ' + (mProfit-mExp).toLocaleString();
 
     // Re-apply blur state
     document.querySelectorAll('.blur').forEach(el => el.classList.toggle('show', !isPrivate));
@@ -1760,9 +1773,9 @@ const LANG = {
         newTx:'New Transaction', custName:'Customer Name', phone:'WhatsApp Number',
         addItems:'Add Items', desc:'Description / Service', costPrice:'Cost Price (CP)',
         salePrice:'Sale Price (SP)', addBill:'Add to Bill', saveBill:'Save Bill',
-        grandTotal:'Grand Total', todaySales:'Today Sales', monthlyProfit:'Monthly Profit',
-        pendingDues:'Pending Dues', pendingJobs:'Pending Jobs', stockValue:'Total Stock Value',
-        monthlyExp:'Monthly Expenses'
+        grandTotal:'Grand Total', todaySales:'Today Sales', todayProfit:'Today Profit',
+        weeklySales:'Weekly Sales', weeklyProfit:'Weekly Profit',
+        monthlySales:'Monthly Sales', monthlyProfit:'Monthly Profit', stockValue:'Total Stock Value'
     },
     kn: {
         home:'ಮನೆ', billing:'ಬಿಲ್ಲಿಂಗ್', repairs:'ರಿಪೇರಿ', stock:'ಸ್ಟಾಕ್',
@@ -1771,9 +1784,9 @@ const LANG = {
         newTx:'ಹೊಸ ವ್ಯವಹಾರ', custName:'ಗ್ರಾಹಕರ ಹೆಸರು', phone:'WhatsApp ನಂಬರ್',
         addItems:'ಐಟಂ ಸೇರಿಸಿ', desc:'ವಿವರಣೆ / ಸೇವೆ', costPrice:'ಖರ್ಚು ಬೆಲೆ (CP)',
         salePrice:'ಮಾರಾಟ ಬೆಲೆ (SP)', addBill:'ಬಿಲ್‌ಗೆ ಸೇರಿಸಿ', saveBill:'ಬಿಲ್ ಉಳಿಸಿ',
-        grandTotal:'ಒಟ್ಟು ಮೊತ್ತ', todaySales:'ಇಂದಿನ ಮಾರಾಟ', monthlyProfit:'ತಿಂಗಳ ಲಾಭ',
-        pendingDues:'ಬಾಕಿ ಮೊತ್ತ', pendingJobs:'ಬಾಕಿ ಕೆಲಸ', stockValue:'ಒಟ್ಟು ಸ್ಟಾಕ್ ಮೌಲ್ಯ',
-        monthlyExp:'ತಿಂಗಳ ವೆಚ್ಚ'
+        grandTotal:'ಒಟ್ಟು ಮೊತ್ತ', todaySales:'ಇಂದಿನ ಮಾರಾಟ', todayProfit:'ಇಂದಿನ ಲಾಭ',
+        weeklySales:'ವಾರದ ಮಾರಾಟ', weeklyProfit:'ವಾರದ ಲಾಭ',
+        monthlySales:'ತಿಂಗಳ ಮಾರಾಟ', monthlyProfit:'ತಿಂಗಳ ಲಾಭ', stockValue:'ಒಟ್ಟು ಸ್ಟಾಕ್ ಮೌಲ್ಯ'
     }
 };
 let currentLang = localStorage.getItem('jay_lang') || 'en';
@@ -1797,9 +1810,13 @@ function applyLang() {
     });
     // Stat labels
     const statMap = {
-        'statStock':   'stockValue',  'statSales':   'todaySales',
-        'statProfit':  'monthlyProfit','statDues':   'pendingDues',
-        'statExpenses':'monthlyExp',  'statPending': 'pendingJobs'
+        'statStock':         'stockValue',
+        'statSales':         'todaySales',
+        'statTodayProfit':   'todayProfit',
+        'statWeeklySales':   'weeklySales',
+        'statWeeklyProfit':  'weeklyProfit',
+        'statMonthlySales':  'monthlySales',
+        'statProfit':        'monthlyProfit'
     };
     Object.entries(statMap).forEach(([id,key]) => {
         const box = document.getElementById(id)?.previousElementSibling;
