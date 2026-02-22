@@ -342,6 +342,93 @@
     </div>
 
     <div class="card">
+        <div class="card-title">📊 Google Sheets Sync</div>
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">
+            Bills ಮತ್ತು Stock data Google Sheets ಗೆ auto-sync ಆಗಲು Apps Script URL ಇಲ್ಲಿ ಹಾಕಿ.
+        </div>
+        <input id="setScriptUrl" placeholder="Google Apps Script Web App URL (https://script.google.com/...)" style="margin-bottom:8px;">
+        <button class="btn-main" onclick="saveScriptUrl()"><i class="material-icons-round">save</i> Save Script URL</button>
+        <div id="syncStatus" style="font-size:11px;color:var(--text-dim);text-align:center;margin-top:8px;"></div>
+        <button class="btn-purple mt" onclick="manualSyncAll()"><i class="material-icons-round">sync</i> Sync All Data Now</button>
+        <div class="alert alert-warn" style="margin-top:10px;font-size:12px;">
+            ⚠️ ಮೊದಲು ಕೆಳಗಿನ Google Apps Script copy ಮಾಡಿ setup ಮಾಡಿ. Bills save ಆದಾಗ automatic sync ಆಗುತ್ತದೆ.
+        </div>
+        <details style="margin-top:10px;">
+            <summary style="font-size:12px;color:var(--primary);cursor:pointer;font-weight:700;">📋 Apps Script Setup Instructions (click to expand)</summary>
+            <div style="font-size:11px;color:var(--text-dim);margin-top:8px;line-height:1.7;background:rgba(255,255,255,0.03);border-radius:8px;padding:10px;">
+                1️⃣ <b>script.google.com</b> ತೆರೆಯಿರಿ → New Project<br>
+                2️⃣ ಕೆಳಗಿನ code ಪೂರ್ತಿ paste ಮಾಡಿ (default code delete ಮಾಡಿ)<br>
+                3️⃣ <b>SHEET_ID</b> ಅಲ್ಲಿ ನಿಮ್ಮ Google Sheet ID ಹಾಕಿ<br>
+                4️⃣ Deploy → New deployment → Web app<br>
+                5️⃣ Execute as: <b>Me</b>, Who has access: <b>Anyone</b><br>
+                6️⃣ Deploy ಮಾಡಿ URL copy ಮಾಡಿ ಮೇಲೆ paste ಮಾಡಿ<br><br>
+                <b style="color:var(--primary);">--- Apps Script Code ---</b><br>
+                <textarea readonly style="width:100%;height:200px;font-size:10px;font-family:monospace;background:#0a0a0c;color:#e0e0e0;border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px;resize:none;margin-top:4px;">const SHEET_ID = 'YOUR_GOOGLE_SHEET_ID_HERE';
+
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const ss = SpreadsheetApp.openById(SHEET_ID);
+
+    if (data.type === 'bill') {
+      syncBill(ss, data.bill);
+    } else if (data.type === 'stock') {
+      syncAllStock(ss, data.stocks);
+    } else if (data.type === 'all') {
+      data.bills.forEach(b => syncBill(ss, b));
+      syncAllStock(ss, data.stocks);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({status:'ok'}))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({status:'error', msg: err.toString()}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function syncBill(ss, bill) {
+  let sheet = ss.getSheetByName('Bills');
+  if (!sheet) {
+    sheet = ss.insertSheet('Bills');
+    sheet.appendRow(['Bill ID','Date','Customer','Phone','Items','Total (SP)','Cost','Profit','Payment','Status','Is Due','Due Amount']);
+  }
+  // Check if bill already exists (update)
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(bill.id)) {
+      const items = bill.items.map(it => it.brand + ' ' + it.model + ' ' + it.item + ' ₹' + it.price).join(' | ');
+      sheet.getRange(i+1, 1, 1, 12).setValues([[
+        bill.id, bill.dateTime, bill.name, bill.phone, items,
+        bill.sell, bill.cost, bill.sell - bill.cost,
+        bill.payMode, bill.status, bill.isDue ? 'Yes' : 'No', bill.dueAmount || 0
+      ]]);
+      return;
+    }
+  }
+  // New bill
+  const items = bill.items.map(it => it.brand + ' ' + it.model + ' ' + it.item + ' ₹' + it.price).join(' | ');
+  sheet.appendRow([
+    bill.id, bill.dateTime, bill.name, bill.phone, items,
+    bill.sell, bill.cost, bill.sell - bill.cost,
+    bill.payMode, bill.status, bill.isDue ? 'Yes' : 'No', bill.dueAmount || 0
+  ]);
+}
+
+function syncAllStock(ss, stocks) {
+  let sheet = ss.getSheetByName('Stock');
+  if (!sheet) sheet = ss.insertSheet('Stock');
+  sheet.clearContents();
+  sheet.appendRow(['ID','Category','Brand','Model','Item Name','Buy Price','Sell Price','Qty','Stock Value']);
+  stocks.forEach(s => {
+    sheet.appendRow([s.id, s.cat, s.brand, s.model, s.name, s.buy, s.sell, s.qty, s.buy * s.qty]);
+  });
+}</textarea>
+            </div>
+        </details>
+    </div>
+
+    <div class="card">
         <div class="card-title">☁️ Google Drive Backup</div>
         <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">
             ನಿಮ್ಮ Google Drive ಲಿಂಕ್ ಇಲ್ಲಿ ಹಾಕಿ. Backup file download ಆದ ಮೇಲೆ Drive ಅಲ್ಲಿ upload ಮಾಡಿ.
@@ -1016,6 +1103,8 @@ function saveFinalBill() {
     resetBillForm();
     updateDashboard();
     alert(editBillID ? 'Bill updated! ✅' : 'Bill saved! ✅');
+    // Auto sync to Google Sheets
+    syncBillToSheets(bill);
 }
 
 function editBill(id) {
@@ -1095,6 +1184,7 @@ function addStock() {
     if(!s.name || !s.qty) return alert('Enter item name and quantity');
     db.stocks.push(s);
     saveDB(); renderStock(); updateDashboard();
+    syncStockToSheets();
     ['sBrand','sModel','sName','sBuy','sSell','sQty'].forEach(i => document.getElementById(i).value='');
 }
 
@@ -1159,6 +1249,7 @@ function saveStockEdit() {
     s.sell  = Number(document.getElementById('esSell').value) || 0;
     s.qty   = Number(document.getElementById('esQty').value);
     saveDB(); renderStock(); updateDashboard(); closeStockModal();
+    syncStockToSheets();
 }
 
 function closeStockModal() { editStockID=null; document.getElementById('stockModal').classList.add('hidden'); }
@@ -1731,6 +1822,99 @@ function applyLang() {
     const gt = document.querySelector('.cart-total-row span');
     if(gt && L.grandTotal) gt.innerText = L.grandTotal;
 }
+
+// ===================== GOOGLE SHEETS SYNC =====================
+function saveScriptUrl() {
+    const url = document.getElementById('setScriptUrl').value.trim();
+    if(!url) { alert('Script URL ಹಾಕಿ!'); return; }
+    localStorage.setItem('jay_script_url', url);
+    toast('✅ Script URL saved!');
+    updateSyncStatus('✅ URL saved. Bill save ಆದಾಗ auto-sync ಆಗುತ್ತದೆ.');
+}
+
+function updateSyncStatus(msg, color) {
+    const el = document.getElementById('syncStatus');
+    if(!el) return;
+    el.innerText = msg || '';
+    el.style.color = color || 'var(--text-dim)';
+}
+
+async function syncBillToSheets(bill) {
+    const url = localStorage.getItem('jay_script_url');
+    if(!url) return; // No URL set, skip silently
+
+    updateSyncStatus('🔄 Google Sheets sync ಆಗ್ತಿದೆ...', 'var(--warn)');
+    document.getElementById('firebaseStatus').innerText = '📊 Sheets: Syncing...';
+
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            mode: 'no-cors', // Google Apps Script requires no-cors
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'bill', bill })
+        });
+        // no-cors means we can't read response, but if no error = success
+        updateSyncStatus('✅ Last bill sync: ' + new Date().toLocaleTimeString('en-IN'), 'var(--accent)');
+        document.getElementById('firebaseStatus').innerText = '📊 Sheets: Synced ✅';
+        document.getElementById('firebaseStatus').style.color = '#69ff47';
+        setTimeout(() => {
+            document.getElementById('firebaseStatus').innerText = '☁️ Firebase: Connected ✅';
+        }, 3000);
+    } catch(err) {
+        updateSyncStatus('❌ Sync failed. Internet check ಮಾಡಿ.', 'var(--danger)');
+        document.getElementById('firebaseStatus').innerText = '📊 Sheets: Sync Failed ❌';
+        document.getElementById('firebaseStatus').style.color = '#ff1744';
+        setTimeout(() => {
+            document.getElementById('firebaseStatus').innerText = '☁️ Firebase: Connected ✅';
+            document.getElementById('firebaseStatus').style.color = '#69ff47';
+        }, 4000);
+    }
+}
+
+async function syncStockToSheets() {
+    const url = localStorage.getItem('jay_script_url');
+    if(!url) return;
+    try {
+        await fetch(url, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'stock', stocks: db.stocks })
+        });
+        updateSyncStatus('✅ Stock sync: ' + new Date().toLocaleTimeString('en-IN'), 'var(--accent)');
+    } catch(err) {
+        updateSyncStatus('❌ Stock sync failed.', 'var(--danger)');
+    }
+}
+
+async function manualSyncAll() {
+    const url = localStorage.getItem('jay_script_url');
+    if(!url) { alert('ಮೊದಲು Google Script URL ಹಾಕಿ!'); return; }
+    updateSyncStatus('🔄 ಎಲ್ಲ data sync ಆಗ್ತಿದೆ...', 'var(--warn)');
+    try {
+        await fetch(url, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'all', bills: db.bills, stocks: db.stocks })
+        });
+        updateSyncStatus('✅ All data synced: ' + new Date().toLocaleTimeString('en-IN'), 'var(--accent)');
+        toast('✅ ಎಲ್ಲ data Google Sheets ಗೆ sync ಆಯಿತು!');
+    } catch(err) {
+        updateSyncStatus('❌ Sync failed. URL check ಮಾಡಿ.', 'var(--danger)');
+        toast('❌ Sync failed!');
+    }
+}
+
+// Init script URL in settings
+window.addEventListener('DOMContentLoaded', () => {
+    const su = localStorage.getItem('jay_script_url') || '';
+    if(su) {
+        const el = document.getElementById('setScriptUrl');
+        if(el) el.value = su;
+        updateSyncStatus('✅ Script URL configured. Auto-sync active.', 'var(--accent)');
+    }
+});
 
 function exportData() {
     const data = { bills: db.bills, stocks: db.stocks, expenses: db.expenses, repairs: db.repairs||[], version: 'v38' };
