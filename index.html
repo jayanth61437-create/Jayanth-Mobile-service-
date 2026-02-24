@@ -260,6 +260,18 @@
         /* AUTO STOCK BADGE */
         .auto-stock-note { background: rgba(105,255,71,0.08); border: 1px solid rgba(105,255,71,0.2); border-radius: 8px; padding: 7px 12px; font-size: 12px; color: var(--accent); margin: 4px 0; display: none; }
         .auto-stock-note.show { display: block; }
+
+        /* CUSTOMER CARDS */
+        .cust-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin-bottom: 10px; }
+        .cust-card-name { font-size: 15px; font-weight: 700; color: var(--primary); }
+        .cust-card-phone { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+        .cust-type-pill { padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+        .pill-regular { background: var(--primary-dim); color: var(--primary); }
+        .pill-vip { background: rgba(224,64,251,0.15); color: var(--purple); }
+        .pill-wholesale { background: var(--warn-dim); color: var(--warn); }
+        .pill-new { background: var(--accent-dim); color: var(--accent); }
+        .dev-card { background: var(--card2); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 8px; }
+        .imei-mono { font-family: monospace; font-size: 12px; color: var(--text-dim); }
     </style>
 </head>
 <body>
@@ -666,6 +678,7 @@ function syncAllStock(ss, stocks) {
     <div class="nav-item" onclick="showTab('dayclose',this)"><i class="material-icons-round">today</i>Close</div>
     <div class="nav-item" onclick="showTab('upiSection',this)"><i class="material-icons-round">qr_code</i>UPI</div>
     <div class="nav-item" onclick="showTab('reports',this)"><i class="material-icons-round">bar_chart</i>Reports</div>
+    <div class="nav-item" onclick="showTab('customers',this)"><i class="material-icons-round">people</i>Customers</div>
 </div>
 
 <div class="modal-bg hidden" id="stockModal" onclick="if(event.target===this)closeStockModal()">
@@ -730,6 +743,161 @@ function syncAllStock(ss, stocks) {
         <div style="text-align:center;font-size:12px;color:var(--text-dim);margin-top:6px;">Show this to customer · Works with GPay, PhonePe, Paytm, BHIM</div>
     </div>
 </section>
+
+<!-- CUSTOMERS + IMEI SCANNER SECTION -->
+<section id="customers">
+
+  <!-- Sub Tabs -->
+  <div class="sub-tabs" style="margin-bottom:12px;">
+    <button class="sub-tab active" id="ctab-list" onclick="showCustTab('list')">👥 Customers</button>
+    <button class="sub-tab" id="ctab-scanner" onclick="showCustTab('scanner')">📷 IMEI Scanner</button>
+    <button class="sub-tab" id="ctab-devices" onclick="showCustTab('devices')">📲 Devices</button>
+  </div>
+
+  <!-- ===== CUSTOMER LIST ===== -->
+  <div id="cust-tab-list">
+    <input id="custSearch" placeholder="🔍 Name / Phone search..." oninput="renderCustomers()" style="margin-bottom:10px;">
+    <button class="btn-main" onclick="openAddCustomer()" style="margin-bottom:12px;">➕ New Customer Add ಮಾಡಿ</button>
+    <div id="customerList"></div>
+  </div>
+
+  <!-- ===== SCANNER ===== -->
+  <div id="cust-tab-scanner" class="hidden">
+    <div class="card">
+      <div class="card-title">📷 Barcode / IMEI Scanner</div>
+      <div id="scannerBox" style="background:#000;border-radius:14px;overflow:hidden;min-height:240px;display:flex;align-items:center;justify-content:center;margin-bottom:12px;border:2px solid var(--purple);position:relative;">
+        <div id="scanPlaceholder" style="text-align:center;color:var(--text-dim);padding:30px;">
+          <div style="font-size:3rem;">📷</div>
+          <p style="font-size:13px;margin-top:8px;">Camera start ಮಾಡಲು ಕೆಳಗೆ click ಮಾಡಿ</p>
+        </div>
+        <div id="scanViewport" style="display:none;width:100%;"></div>
+      </div>
+      <div class="g2" style="margin-bottom:12px;">
+        <button class="btn-purple" onclick="startImeiScanner()"><i class="material-icons-round">photo_camera</i> Camera Start</button>
+        <button class="btn-outline" onclick="stopImeiScanner()"><i class="material-icons-round">stop</i> Stop</button>
+      </div>
+      <div class="card-title">⌨️ Manual IMEI / Barcode</div>
+      <div style="display:flex;gap:8px;">
+        <input id="manualImei" type="number" placeholder="15-digit IMEI ಅಥವಾ Barcode" style="margin:0;flex:1;">
+        <button class="btn-accent btn-sm" style="white-space:nowrap;" onclick="processManualImei()">✅ Check</button>
+      </div>
+    </div>
+
+    <!-- Scan Result -->
+    <div id="imeiResultBox" class="hidden">
+      <div class="card" style="border-color:var(--primary);">
+        <div class="card-title" style="color:var(--primary);">SCANNED / ENTERED</div>
+        <div id="imeiDisplay" style="font-size:1.3rem;font-weight:800;color:var(--primary);letter-spacing:2px;word-break:break-all;text-align:center;margin:8px 0;"></div>
+        <div id="imeiTypeInfo" style="font-size:0.78rem;color:var(--text-dim);text-align:center;"></div>
+
+        <!-- Auto Match Box -->
+        <div id="imeiMatchBox" class="hidden" style="margin-top:12px;background:rgba(105,255,71,0.08);border:1px solid rgba(105,255,71,0.3);border-radius:10px;padding:14px;">
+          <div style="font-size:11px;color:var(--accent);font-weight:700;margin-bottom:8px;letter-spacing:1px;">✨ AUTO MATCH ಆಯ್ತು!</div>
+          <div style="display:flex;gap:12px;align-items:center;">
+            <div style="font-size:2rem;">📱</div>
+            <div>
+              <div id="matchBrand" style="font-size:1rem;font-weight:800;"></div>
+              <div id="matchModel" style="font-size:0.9rem;color:var(--accent);font-weight:700;"></div>
+              <div id="matchSource" style="font-size:0.7rem;color:var(--text-dim);margin-top:2px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="g2 mt">
+          <button class="btn-main" onclick="openLinkImei()"><i class="material-icons-round">person_add</i> Customer Link</button>
+          <button class="btn-accent" onclick="openSaveDevice()"><i class="material-icons-round">save</i> Device Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Scans -->
+    <div class="card">
+      <div class="card-title">🕒 Recent Scans</div>
+      <div id="recentScansList"></div>
+    </div>
+  </div>
+
+  <!-- ===== DEVICES ===== -->
+  <div id="cust-tab-devices" class="hidden">
+    <input id="deviceSearch" placeholder="🔍 IMEI / Model search..." oninput="renderDevices()" style="margin-bottom:10px;">
+    <button class="btn-warn" onclick="openAddDevice()" style="margin-bottom:12px;">➕ Device Manual Add</button>
+    <div id="deviceList"></div>
+  </div>
+
+</section>
+
+<!-- Customer Add/Edit Modal -->
+<div class="modal-bg hidden" id="custModal" onclick="if(event.target===this)document.getElementById('custModal').classList.add('hidden')">
+  <div class="modal-box">
+    <div class="modal-title" id="custModalTitle">👤 Customer Add</div>
+    <input type="hidden" id="editCustId">
+    <div class="g2">
+      <input id="cName" placeholder="Customer Name *">
+      <input id="cPhone" type="tel" placeholder="Phone * (10 digits)" maxlength="10">
+    </div>
+    <div class="g2">
+      <input id="cPhone2" type="tel" placeholder="Alt Phone" maxlength="10">
+      <input id="cArea" placeholder="ಊರು / Area">
+    </div>
+    <select id="cType">
+      <option>Regular</option><option>VIP</option><option>Wholesale</option><option>New</option>
+    </select>
+    <textarea id="cNotes" placeholder="Notes..." style="min-height:60px;resize:vertical;"></textarea>
+    <div class="g2 mt">
+      <button class="btn-main" onclick="saveCustomer()"><i class="material-icons-round">save</i> Save</button>
+      <button class="btn-outline" onclick="document.getElementById('custModal').classList.add('hidden')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Device Add/Edit Modal -->
+<div class="modal-bg hidden" id="deviceModal" onclick="if(event.target===this)document.getElementById('deviceModal').classList.add('hidden')">
+  <div class="modal-box">
+    <div class="modal-title" id="devModalTitle">📲 Device Add</div>
+    <input type="hidden" id="editDevId">
+    <div class="g2">
+      <select id="dBrand">
+        <option>Samsung</option><option>Vivo</option><option>Oppo</option><option>Realme</option>
+        <option>Mi / Redmi</option><option>iQOO</option><option>OnePlus</option><option>iPhone</option>
+        <option>Nokia</option><option>Motorola</option><option>Other</option>
+      </select>
+      <input id="dModel" placeholder="Model (e.g. A15)">
+    </div>
+    <div class="g2">
+      <input id="dImei1" placeholder="IMEI 1 (15 digits)" maxlength="15" type="number">
+      <input id="dImei2" placeholder="IMEI 2 (optional)" maxlength="15" type="number">
+    </div>
+    <select id="dCustomer">
+      <option value="">— Customer Select ಮಾಡಿ —</option>
+    </select>
+    <div class="g2">
+      <input id="dColor" placeholder="Colour">
+      <input id="dDate" type="date">
+    </div>
+    <textarea id="dNotes" placeholder="Notes / Issues..." style="min-height:55px;resize:vertical;"></textarea>
+    <div class="g2 mt">
+      <button class="btn-warn" onclick="saveDevice()"><i class="material-icons-round">save</i> Save</button>
+      <button class="btn-outline" onclick="document.getElementById('deviceModal').classList.add('hidden')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Link IMEI Modal -->
+<div class="modal-bg hidden" id="linkModal" onclick="if(event.target===this)document.getElementById('linkModal').classList.add('hidden')">
+  <div class="modal-box">
+    <div class="modal-title">🔗 IMEI Customer ಗೆ Link</div>
+    <p style="font-size:12px;color:var(--text-dim);margin:0 0 10px;">IMEI: <strong id="linkImeiDisplay" style="color:var(--primary);"></strong></p>
+    <select id="linkCustSelect">
+      <option value="">— Customer Select —</option>
+    </select>
+    <select id="linkBrand" style="margin-top:0;">
+      <option>Samsung</option><option>Vivo</option><option>Oppo</option><option>Realme</option>
+      <option>Mi / Redmi</option><option>iQOO</option><option>OnePlus</option><option>iPhone</option><option>Other</option>
+    </select>
+    <input id="linkModel" placeholder="Model name">
+    <button class="btn-main mt" onclick="confirmImeiLink()"><i class="material-icons-round">link</i> Link & Save</button>
+  </div>
+</div>
 
 <!-- TOAST -->
 <div id="toast"></div>
@@ -1959,7 +2127,374 @@ function importData(e) {
     e.target.value = '';
 }
 
-// ===================== INIT =====================
+// ===================== CUSTOMER DATABASE =====================
+let customers = JSON.parse(localStorage.getItem('jay_customers') || '[]');
+let custDevices = JSON.parse(localStorage.getItem('jay_devices') || '[]');
+let recentScans = JSON.parse(localStorage.getItem('jay_scans') || '[]');
+let currentImei = '';
+let imeiScannerRunning = false;
+
+function saveCustDB() {
+    localStorage.setItem('jay_customers', JSON.stringify(customers));
+    localStorage.setItem('jay_devices', JSON.stringify(custDevices));
+    localStorage.setItem('jay_scans', JSON.stringify(recentScans));
+}
+
+function showCustTab(tab) {
+    ['list','scanner','devices'].forEach(t => {
+        document.getElementById('cust-tab-' + t).classList.add('hidden');
+        document.getElementById('ctab-' + t).classList.remove('active');
+    });
+    document.getElementById('cust-tab-' + tab).classList.remove('hidden');
+    document.getElementById('ctab-' + tab).classList.add('active');
+    if (tab === 'list') renderCustomers();
+    if (tab === 'scanner') renderRecentScans();
+    if (tab === 'devices') renderDevices();
+}
+
+// --- Customers ---
+function renderCustomers() {
+    const q = (document.getElementById('custSearch')?.value || '').toLowerCase();
+    let list = customers;
+    if (q) list = list.filter(c => c.name.toLowerCase().includes(q) || c.phone.includes(q));
+    const el = document.getElementById('customerList');
+    if (!el) return;
+    if (!list.length) {
+        el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-dim);">👤 Customer ಇಲ್ಲ. Add ಮಾಡಿ!</div>';
+        return;
+    }
+    const pillClass = { Regular:'pill-regular', VIP:'pill-vip', Wholesale:'pill-wholesale', New:'pill-new' };
+    el.innerHTML = list.map(c => {
+        const devs = custDevices.filter(d => d.custId === c.id);
+        return `<div class="cust-card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div>
+                    <div class="cust-card-name">${c.name}</div>
+                    <div class="cust-card-phone">📞 ${c.phone}${c.phone2 ? ' / ' + c.phone2 : ''}${c.area ? ' · 📍 '+c.area : ''}</div>
+                </div>
+                <span class="cust-type-pill ${pillClass[c.type]||'pill-regular'}">${c.type}</span>
+            </div>
+            ${devs.length ? `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">${devs.map(d=>`<span style="background:rgba(224,64,251,0.12);color:var(--purple);padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;">📱 ${d.brand} ${d.model}</span>`).join('')}</div>` : ''}
+            ${c.notes ? `<div style="font-size:12px;color:var(--text-dim);margin-top:6px;">📝 ${c.notes}</div>` : ''}
+            <div class="bill-actions" style="margin-top:10px;">
+                <button class="btn-outline btn-sm" onclick="editCustomer('${c.id}')">✏️ Edit</button>
+                <a href="tel:${c.phone}" class="btn-accent btn-sm" style="text-decoration:none;display:flex;align-items:center;justify-content:center;gap:4px;border-radius:8px;padding:8px 14px;font-weight:700;font-size:12px;color:#000;">📞 Call</a>
+                <a href="https://wa.me/91${c.phone}" target="_blank" class="btn-wa btn-sm" style="text-decoration:none;display:flex;align-items:center;justify-content:center;gap:4px;border-radius:8px;padding:8px 14px;font-weight:700;font-size:12px;color:#fff;">💬 WA</a>
+                <button class="btn-danger btn-sm" onclick="deleteCustomer('${c.id}')">🗑</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function openAddCustomer() {
+    document.getElementById('custModalTitle').textContent = '👤 Customer Add';
+    document.getElementById('editCustId').value = '';
+    ['cName','cPhone','cPhone2','cArea','cNotes'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('cType').value = 'Regular';
+    document.getElementById('custModal').classList.remove('hidden');
+}
+
+function editCustomer(id) {
+    const c = customers.find(x => x.id === id); if (!c) return;
+    document.getElementById('custModalTitle').textContent = '✏️ Customer Edit';
+    document.getElementById('editCustId').value = c.id;
+    document.getElementById('cName').value  = c.name;
+    document.getElementById('cPhone').value = c.phone;
+    document.getElementById('cPhone2').value = c.phone2 || '';
+    document.getElementById('cArea').value  = c.area  || '';
+    document.getElementById('cType').value  = c.type;
+    document.getElementById('cNotes').value = c.notes || '';
+    document.getElementById('custModal').classList.remove('hidden');
+}
+
+function saveCustomer() {
+    const name  = document.getElementById('cName').value.trim();
+    const phone = document.getElementById('cPhone').value.trim();
+    if (!name || !phone) { toast('⚠️ Name ಮತ್ತು Phone ಹಾಕಿ!'); return; }
+    if (phone.length < 10) { toast('⚠️ Valid 10-digit phone ಹಾಕಿ!'); return; }
+    const editId = document.getElementById('editCustId').value;
+    const data = {
+        id: editId || 'C' + Date.now(),
+        name, phone,
+        phone2: document.getElementById('cPhone2').value.trim(),
+        area:   document.getElementById('cArea').value.trim(),
+        type:   document.getElementById('cType').value,
+        notes:  document.getElementById('cNotes').value.trim(),
+        createdAt: editId ? (customers.find(c=>c.id===editId)?.createdAt || new Date().toISOString()) : new Date().toISOString()
+    };
+    if (editId) { customers = customers.map(c => c.id === editId ? data : c); toast('✅ Customer update ಆಯ್ತು!'); }
+    else        { customers.push(data); toast('✅ Customer save ಆಯ್ತು!'); }
+    saveCustDB();
+    document.getElementById('custModal').classList.add('hidden');
+    renderCustomers();
+}
+
+function deleteCustomer(id) {
+    if (!confirm('ಈ customer delete ಮಾಡಲೇ?')) return;
+    customers = customers.filter(c => c.id !== id);
+    saveCustDB(); renderCustomers(); toast('🗑 Customer deleted!');
+}
+
+// --- IMEI Scanner ---
+const TAC_DB = {
+    '352':{ brand:'Samsung', model:'Galaxy A15' }, '353':{ brand:'Samsung', model:'Galaxy A25' },
+    '354':{ brand:'Samsung', model:'Galaxy A55' }, '355':{ brand:'Samsung', model:'Galaxy M14' },
+    '356':{ brand:'Samsung', model:'Galaxy M34' }, '357':{ brand:'Samsung', model:'Galaxy F15' },
+    '358':{ brand:'Samsung', model:'Galaxy S23' }, '860':{ brand:'Vivo', model:'Y27s' },
+    '861':{ brand:'Vivo', model:'Y36' },           '862':{ brand:'Vivo', model:'V29' },
+    '863':{ brand:'Vivo', model:'T2x' },           '864':{ brand:'Vivo', model:'Y100' },
+    '866':{ brand:'Oppo', model:'A18' },           '867':{ brand:'Oppo', model:'A38' },
+    '868':{ brand:'Oppo', model:'A58' },           '869':{ brand:'Oppo', model:'A78' },
+    '870':{ brand:'Realme', model:'C55' },         '871':{ brand:'Realme', model:'C53' },
+    '872':{ brand:'Realme', model:'Narzo 60' },    '873':{ brand:'Realme', model:'11 Pro' },
+    '874':{ brand:'Redmi', model:'Note 13' },      '875':{ brand:'Redmi', model:'12' },
+    '876':{ brand:'Redmi', model:'A2+' },          '877':{ brand:'Mi', model:'13C' },
+    '878':{ brand:'iQOO', model:'Z7' },            '879':{ brand:'iQOO', model:'Neo 7' },
+    '013':{ brand:'iPhone', model:'iPhone 15' },   '014':{ brand:'iPhone', model:'iPhone 14' },
+    '015':{ brand:'iPhone', model:'iPhone 13' },   '880':{ brand:'OnePlus', model:'Nord CE3' }
+};
+
+function matchFromStock(imei) {
+    // 1) ನಿಮ್ಮ stock ಅಲ್ಲಿ match ಮಾಡು
+    const stock = db.stocks || [];
+    const matched = stock.find(s => s.imei && String(s.imei).startsWith(imei.substring(0,6)));
+    if (matched) return { brand: matched.brand, model: matched.model || matched.name, fromStock: true };
+    // 2) TAC database
+    const tac = imei.substring(0,3);
+    if (TAC_DB[tac]) return { ...TAC_DB[tac], fromStock: false };
+    // 3) Stock brand name partial match
+    const byBrand = stock.find(s => s.brand && imei.toLowerCase().includes(s.brand.toLowerCase().substring(0,3)));
+    if (byBrand) return { brand: byBrand.brand, model: byBrand.model || byBrand.name, fromStock: true };
+    return null;
+}
+
+function luhnCheck(imei) {
+    let sum = 0;
+    for (let i = 0; i < 15; i++) {
+        let d = parseInt(imei[i]);
+        if (i % 2 === 1) { d *= 2; if (d > 9) d -= 9; }
+        sum += d;
+    }
+    return sum % 10 === 0;
+}
+
+function startImeiScanner() {
+    if (imeiScannerRunning) return;
+    if (typeof Quagga === 'undefined') {
+        // Dynamically load Quagga
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js';
+        s.onload = () => _startQuagga();
+        document.head.appendChild(s);
+    } else { _startQuagga(); }
+}
+
+function _startQuagga() {
+    const vp = document.getElementById('scanViewport');
+    document.getElementById('scanViewport').style.display = 'block';
+    document.getElementById('scanPlaceholder').style.display = 'none';
+    imeiScannerRunning = true;
+    Quagga.init({
+        inputStream: { type:'LiveStream', target: vp, constraints:{ facingMode:'environment', width:{ideal:1280}, height:{ideal:720} } },
+        decoder: { readers:['ean_reader','code_128_reader','code_39_reader','upc_reader'] },
+        locate: true
+    }, err => {
+        if (err) { toast('❌ Camera permission deny ಆಗಿದೆ!'); stopImeiScanner(); return; }
+        Quagga.start();
+    });
+    Quagga.onDetected(data => {
+        const code = data.codeResult.code;
+        if (code) { stopImeiScanner(); showImeiResult(code, 'Barcode Scan'); }
+    });
+}
+
+function stopImeiScanner() {
+    if (imeiScannerRunning) { try { Quagga.stop(); } catch(e){} imeiScannerRunning = false; }
+    document.getElementById('scanViewport').style.display = 'none';
+    document.getElementById('scanPlaceholder').style.display = 'block';
+}
+
+function processManualImei() {
+    const val = document.getElementById('manualImei').value.trim();
+    if (!val || val.length < 8) { toast('⚠️ Valid IMEI / Barcode ಹಾಕಿ!'); return; }
+    showImeiResult(val, 'Manual Entry');
+}
+
+function showImeiResult(code, source) {
+    currentImei = code;
+    const isImei = code.length === 15 && /^\d+$/.test(code);
+    const matched = isImei ? matchFromStock(code) : null;
+
+    document.getElementById('imeiDisplay').textContent = code;
+    document.getElementById('imeiTypeInfo').textContent = isImei
+        ? `✅ Valid IMEI (${source}) · Luhn: ${luhnCheck(code) ? '✅ Pass' : '❌ Fail'}`
+        : `📦 Barcode (${source}) · Length: ${code.length}`;
+
+    const matchBox = document.getElementById('imeiMatchBox');
+    if (matched) {
+        matchBox.classList.remove('hidden');
+        document.getElementById('matchBrand').textContent  = matched.brand;
+        document.getElementById('matchModel').textContent  = matched.model;
+        document.getElementById('matchSource').textContent = matched.fromStock ? '📦 ನಿಮ್ಮ Stock ಇಂದ match' : '🗄️ IMEI Database ಇಂದ match';
+        // Pre-fill link modal
+        document.getElementById('linkBrand').value = matched.brand;
+        document.getElementById('linkModel').value = matched.model;
+    } else { matchBox.classList.add('hidden'); }
+
+    document.getElementById('imeiResultBox').classList.remove('hidden');
+
+    recentScans.unshift({ code, source, time: new Date().toLocaleString('kn-IN'), isImei, brand: matched?.brand||'', model: matched?.model||'' });
+    if (recentScans.length > 20) recentScans.pop();
+    saveCustDB(); renderRecentScans();
+    toast(matched ? `✅ ${matched.brand} ${matched.model} match ಆಯ್ತು!` : `✅ ${isImei?'IMEI':'Barcode'} detected!`);
+}
+
+function renderRecentScans() {
+    const el = document.getElementById('recentScansList'); if (!el) return;
+    if (!recentScans.length) { el.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-dim);font-size:13px;">ಇನ್ನು scan ಆಗಿಲ್ಲ</div>'; return; }
+    el.innerHTML = recentScans.slice(0,10).map(s => {
+        const devMatch = custDevices.find(d => d.imei1 === s.code || d.imei2 === s.code);
+        const custName = devMatch ? (customers.find(c => c.id === devMatch.custId)?.name || '') : '';
+        return `<div style="background:var(--card2);border-radius:10px;padding:11px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+                <div style="font-family:monospace;font-size:13px;color:var(--primary);">${s.code}</div>
+                ${s.brand ? `<div style="font-size:12px;color:var(--accent);font-weight:600;">📱 ${s.brand} ${s.model}</div>` : ''}
+                <div style="font-size:11px;color:var(--text-dim);">${s.source} · ${s.time}</div>
+                ${custName ? `<div style="font-size:11px;color:var(--accent);">👤 ${custName}</div>` : ''}
+            </div>
+            <span style="background:${s.isImei?'var(--accent-dim)':'var(--primary-dim)'};color:${s.isImei?'var(--accent)':'var(--primary)'};padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;">${s.isImei?'IMEI':'Barcode'}</span>
+        </div>`;
+    }).join('');
+}
+
+function openLinkImei() {
+    if (!currentImei) return;
+    document.getElementById('linkImeiDisplay').textContent = currentImei;
+    const sel = document.getElementById('linkCustSelect');
+    sel.innerHTML = '<option value="">— Select —</option>' + customers.map(c => `<option value="${c.id}">${c.name} (${c.phone})</option>`).join('');
+    document.getElementById('linkModal').classList.remove('hidden');
+}
+
+function confirmImeiLink() {
+    const custId = document.getElementById('linkCustSelect').value;
+    const brand  = document.getElementById('linkBrand').value;
+    const model  = document.getElementById('linkModel').value.trim();
+    if (!custId) { toast('⚠️ Customer select ಮಾಡಿ!'); return; }
+    custDevices.push({ id:'D'+Date.now(), custId, brand, model, imei1: currentImei, imei2:'', color:'', date: new Date().toISOString().split('T')[0], notes:'' });
+    saveCustDB();
+    document.getElementById('linkModal').classList.add('hidden');
+    toast('✅ IMEI customer ಗೆ link ಆಯ್ತು!');
+}
+
+// --- Devices ---
+function openSaveDevice() {
+    if (!currentImei) return;
+    document.getElementById('devModalTitle').textContent = '📲 Device Add (Scanned)';
+    document.getElementById('editDevId').value = '';
+    document.getElementById('dImei1').value = currentImei;
+    document.getElementById('dImei2').value = '';
+    document.getElementById('dColor').value = '';
+    document.getElementById('dNotes').value = '';
+    document.getElementById('dDate').value  = new Date().toISOString().split('T')[0];
+    const matched = matchFromStock(currentImei);
+    document.getElementById('dModel').value = matched?.model || '';
+    if (matched?.brand) {
+        const sel = document.getElementById('dBrand');
+        [...sel.options].forEach(o => { if (o.value === matched.brand) sel.value = matched.brand; });
+    }
+    populateDevCustSelect();
+    document.getElementById('deviceModal').classList.remove('hidden');
+}
+
+function openAddDevice() {
+    document.getElementById('devModalTitle').textContent = '📲 Device Add';
+    document.getElementById('editDevId').value = '';
+    ['dModel','dImei1','dImei2','dColor','dNotes'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('dDate').value = new Date().toISOString().split('T')[0];
+    populateDevCustSelect();
+    document.getElementById('deviceModal').classList.remove('hidden');
+}
+
+function populateDevCustSelect() {
+    const sel = document.getElementById('dCustomer');
+    sel.innerHTML = '<option value="">— No Customer —</option>' + customers.map(c => `<option value="${c.id}">${c.name} (${c.phone})</option>`).join('');
+}
+
+function saveDevice() {
+    const model = document.getElementById('dModel').value.trim();
+    if (!model) { toast('⚠️ Model name ಹಾಕಿ!'); return; }
+    const editId = document.getElementById('editDevId').value;
+    const data = {
+        id: editId || 'D'+Date.now(),
+        custId: document.getElementById('dCustomer').value,
+        brand:  document.getElementById('dBrand').value,
+        model,
+        imei1:  document.getElementById('dImei1').value.trim(),
+        imei2:  document.getElementById('dImei2').value.trim(),
+        color:  document.getElementById('dColor').value.trim(),
+        date:   document.getElementById('dDate').value,
+        notes:  document.getElementById('dNotes').value.trim()
+    };
+    if (editId) { custDevices = custDevices.map(d => d.id === editId ? data : d); toast('✅ Device update ಆಯ್ತು!'); }
+    else        { custDevices.push(data); toast('✅ Device save ಆಯ್ತು!'); }
+    saveCustDB();
+    document.getElementById('deviceModal').classList.add('hidden');
+    renderDevices();
+}
+
+function renderDevices() {
+    const q = (document.getElementById('deviceSearch')?.value || '').toLowerCase();
+    let list = custDevices;
+    if (q) list = list.filter(d => d.model.toLowerCase().includes(q) || d.brand.toLowerCase().includes(q) || (d.imei1||'').includes(q) || (d.imei2||'').includes(q));
+    const el = document.getElementById('deviceList'); if (!el) return;
+    if (!list.length) { el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-dim);">📱 Device ಇಲ್ಲ!</div>'; return; }
+    el.innerHTML = list.map(d => {
+        const cust = customers.find(c => c.id === d.custId);
+        return `<div class="dev-card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div>
+                    <div style="font-weight:700;color:var(--purple);">${d.brand} ${d.model}</div>
+                    ${d.color ? `<div style="font-size:11px;color:var(--text-dim);">${d.color}</div>` : ''}
+                </div>
+                <div style="text-align:right;">
+                    ${cust ? `<div style="font-size:12px;color:var(--primary);">👤 ${cust.name}</div>` : ''}
+                    ${d.date ? `<div style="font-size:11px;color:var(--text-dim);">📅 ${d.date}</div>` : ''}
+                </div>
+            </div>
+            ${d.imei1 ? `<div class="imei-mono">📶 IMEI1: ${d.imei1}</div>` : ''}
+            ${d.imei2 ? `<div class="imei-mono">📶 IMEI2: ${d.imei2}</div>` : ''}
+            ${d.notes ? `<div style="font-size:12px;color:var(--warn);margin-top:5px;">⚠️ ${d.notes}</div>` : ''}
+            <div class="bill-actions" style="margin-top:10px;">
+                <button class="btn-outline btn-sm" onclick="editDevice('${d.id}')">✏️ Edit</button>
+                <button class="btn-danger btn-sm" onclick="deleteDevice('${d.id}')">🗑 Delete</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function editDevice(id) {
+    const d = custDevices.find(x => x.id === id); if (!d) return;
+    document.getElementById('devModalTitle').textContent = '✏️ Device Edit';
+    document.getElementById('editDevId').value  = d.id;
+    document.getElementById('dBrand').value     = d.brand;
+    document.getElementById('dModel').value     = d.model;
+    document.getElementById('dImei1').value     = d.imei1 || '';
+    document.getElementById('dImei2').value     = d.imei2 || '';
+    document.getElementById('dColor').value     = d.color || '';
+    document.getElementById('dDate').value      = d.date  || '';
+    document.getElementById('dNotes').value     = d.notes || '';
+    populateDevCustSelect();
+    document.getElementById('dCustomer').value  = d.custId || '';
+    document.getElementById('deviceModal').classList.remove('hidden');
+}
+
+function deleteDevice(id) {
+    if (!confirm('Delete ಮಾಡಲೇ?')) return;
+    custDevices = custDevices.filter(d => d.id !== id);
+    saveCustDB(); renderDevices(); toast('🗑 Device deleted!');
+}
+
+// ===================== END CUSTOMER DB =====================
 document.getElementById('setShopName').value = shopName;
 document.getElementById('setGLink').value    = googleLink;
 document.querySelector('header h1').innerText = shopName.toUpperCase();
