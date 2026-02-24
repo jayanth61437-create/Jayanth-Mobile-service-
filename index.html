@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Jayanth Mobile Service V39</title>
+    <style>
+        :root {
+            --bg: #0a0a0c;
+            --card: #13131a;
+            --primary: #00e5ff;
+            --accent: #69ff47;
+            --danger: #ff1744;
+            --text: #e0e0e0;
+            --border: rgba(255,255,255,0.07);
+        }
+        /* ಪೂರ್ಣ ವಿನ್ಯಾಸಕ್ಕಾಗಿ ನಿಮ್ಮ ಫೈಲ್‌ನಲ್ಲಿರುವಂತೆ ಸುಂದರವಾದ ಡಾರ್ಕ್ ಥೀಮ್ ಬಳಸಲಾಗಿದೆ */
+        body {
+            margin: 0; font-family: 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg); color: var(--text);
+            padding-bottom: 80px;
+        }
+        /* Header ಮತ್ತು Navigation ವಿನ್ಯಾಸಗಳು */
+        header {
+            background: rgba(10,10,12,0.95); padding: 13px 18px;
+            border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 1000;
+        }
+        .bottom-nav {
+            position: fixed; bottom: 0; width: 100%; height: 66px;
+            background: rgba(10,10,12,0.97); border-top: 1px solid var(--border);
+            display: flex; justify-content: space-around; align-items: center;
+        }
+        /* ಉಳಿದ ಎಲ್ಲಾ CSS ಶೈಲಿಗಳು ಇಲ್ಲಿ ಮುಂದುವರಿಯುತ್ತವೆ... */
+    </style>
+</head>
+<body>
+
+<header>
+    <div>
+        <h1 id="headTitle">JAYANTH MOBILE</h1>
+        <small>V39 ELITE PRO</small>
+        <div id="firebaseStatus">☁️ Firebase: Connecting...</div>
+        <small>📍 Arsikere, Hassan Dist, Karnataka</small>
+    </div>
+</header>
+
+<section id="home" class="active">
+    <div class="stat-grid">
+        <div class="stat-box">
+            <small>Today Sales</small>
+            <div class="val" id="statSales">₹ 0</div>
+        </div>
+        <div class="stat-box">
+            <small>Today Profit</small>
+            <div class="val" id="statTodayProfit">₹ 0</div>
+        </div>
+    </div>
+</section>
+
+<section id="billing">
+    <div class="card">
+        <div class="card-title">New Transaction</div>
+        <input id="bName" placeholder="Customer Name">
+        <input id="bPhone" type="tel" placeholder="WhatsApp Number">
+        <button class="btn-main" onclick="saveFinalBill()">Save Bill</button>
+    </div>
+</section>
+
+<script type="module">
+    // Firebase ಕಾನ್ಫಿಗರೇಶನ್ ಮತ್ತು ಡೇಟಾ ಸೇವ್ ಮಾಡುವ ಫಂಕ್ಷನ್‌ಗಳು
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    const firebaseConfig = {
+        apiKey: "AIzaSyDvvB7S1_1pdQ6tycHDmI0FQMoIpefsBFk",
+        databaseURL: "https://jayanth-mobile-service-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "jayanth-mobile-service"
+    };
+    // ಡೇಟಾಬೇಸ್ ಸಿಂಕ್ ಮಾಡುವ ಲಾಜಿಕ್ ಇಲ್ಲಿ ಮುಂದುವರಿಯುತ್ತದೆ...
+</script>
+
+<script>
+    // ನಿಮ್ಮ ಅಪ್ಲಿಕೇಶನ್‌ನ ಬಿಲ್ಲಿಂಗ್, ಸ್ಕ್ಯಾನರ್ ಮತ್ತು ರಿಪೋರ್ಟ್ ಲಾಜಿಕ್‌ಗಳು
+    function saveFinalBill() {
+        console.log("Saving bill...");
+        // ಬಿಲ್ ಸೇವ್ ಮಾಡಿ ವಾಟ್ಸಾಪ್ ಕಳುಹಿಸುವ ಫಂಕ್ಷನ್
+    }
+</script>
+
+</body>
+</html>
