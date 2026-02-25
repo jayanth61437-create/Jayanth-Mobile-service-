@@ -493,7 +493,18 @@ function syncAllCustomers(ss, customers) {
 
     <div class="card">
         <div class="card-title" id="billFormTitle">New Transaction</div>
-        <input id="bName" placeholder="Customer Name">
+
+        <!-- Customer name with autocomplete -->
+        <div class="search-wrap">
+            <input id="bName" placeholder="Customer Name" autocomplete="off"
+                oninput="customerNameSearch(this.value)"
+                onfocus="customerNameSearch(this.value)">
+            <div id="custNameResults" style="
+                background:#0e0e16; border:1px solid rgba(0,229,255,0.2);
+                border-radius:10px; max-height:180px; overflow-y:auto;
+                margin-top:3px; display:none; position:absolute; z-index:500; width:100%;
+            "></div>
+        </div>
         <input id="bPhone" type="tel" placeholder="WhatsApp Number">
 
         <hr class="divider">
@@ -510,8 +521,18 @@ function syncAllCustomers(ss, customers) {
         </div>
 
         <div class="g2">
-            <input id="bBrand" placeholder="Brand">
-            <input id="bModel" placeholder="Model">
+            <div class="search-wrap" style="position:relative;">
+                <input id="bBrand" placeholder="Brand (v → Vivo...)" autocomplete="off"
+                    oninput="brandSuggest(this.value)"
+                    onfocus="brandSuggest(this.value)">
+                <div id="brandResults" style="background:#0e0e16;border:1px solid rgba(0,229,255,0.2);border-radius:10px;max-height:160px;overflow-y:auto;margin-top:3px;display:none;position:absolute;z-index:500;width:100%;"></div>
+            </div>
+            <div class="search-wrap" style="position:relative;">
+                <input id="bModel" placeholder="Model" autocomplete="off"
+                    oninput="modelSuggest(this.value)"
+                    onfocus="modelSuggest(this.value)">
+                <div id="modelResults" style="background:#0e0e16;border:1px solid rgba(0,229,255,0.2);border-radius:10px;max-height:200px;overflow-y:auto;margin-top:3px;display:none;position:absolute;z-index:500;width:100%;"></div>
+            </div>
         </div>
         <input id="bItem" placeholder="Description / Service">
         <div id="autoStockNote" class="auto-stock-note">✨ New item — will be auto-saved to stock inventory</div>
@@ -606,8 +627,18 @@ function syncAllCustomers(ss, customers) {
             <option value="Spare Parts">Spare Parts</option>
         </select>
         <div class="g2">
-            <input id="sBrand" placeholder="Brand">
-            <input id="sModel" placeholder="Model">
+            <div class="search-wrap" style="position:relative;">
+                <input id="sBrand" placeholder="Brand (v → Vivo...)" autocomplete="off"
+                    oninput="sBrandSuggest(this.value)"
+                    onfocus="sBrandSuggest(this.value)">
+                <div id="sBrandResults" style="background:#0e0e16;border:1px solid rgba(0,229,255,0.2);border-radius:10px;max-height:160px;overflow-y:auto;margin-top:3px;display:none;position:absolute;z-index:500;width:100%;"></div>
+            </div>
+            <div class="search-wrap" style="position:relative;">
+                <input id="sModel" placeholder="Model" autocomplete="off"
+                    oninput="sModelSuggest(this.value)"
+                    onfocus="sModelSuggest(this.value)">
+                <div id="sModelResults" style="background:#0e0e16;border:1px solid rgba(0,229,255,0.2);border-radius:10px;max-height:200px;overflow-y:auto;margin-top:3px;display:none;position:absolute;z-index:500;width:100%;"></div>
+            </div>
         </div>
         <input id="sName" placeholder="Item Name / Description">
         <input id="sBarcodeId" type="hidden">
@@ -1136,8 +1167,12 @@ function updateDashboard() {
 // ===================== LIVE STOCK SEARCH =====================
 function liveSearch(q) {
     const box = document.getElementById('searchResults');
+    // Show all in-stock items even with 1 char
+    const matches = db.stocks.filter(s => s.qty > 0 && (
+        !q.trim() ? false :
+        (s.brand+' '+s.model+' '+s.name+' '+s.cat+' '+(s.barcode||'')).toLowerCase().includes(q.toLowerCase())
+    ));
     if(!q.trim()) { box.classList.remove('open'); box.innerHTML=''; return; }
-    const matches = db.stocks.filter(s => s.qty > 0 && (s.brand+' '+s.model+' '+s.name+' '+s.cat+' '+(s.barcode||'')).toLowerCase().includes(q.toLowerCase()));
     if(!matches.length) {
         box.innerHTML = `<div class="search-item" style="color:var(--text-dim);">No matching stock found</div>`;
     } else {
@@ -1156,8 +1191,27 @@ function liveSearch(q) {
 }
 
 function openSearch() {
+    // On focus show recent/all stock if field empty, else search
     const q = document.getElementById('bSearch').value;
-    if(q) liveSearch(q);
+    if (q) {
+        liveSearch(q);
+    } else {
+        // Show all in-stock items
+        const box = document.getElementById('searchResults');
+        const all = db.stocks.filter(s => s.qty > 0).slice(0, 30);
+        if (!all.length) return;
+        box.innerHTML = all.map(s => {
+            const qColor = s.qty <= 2 ? 'var(--warn)' : 'var(--accent)';
+            return `<div class="search-item" onclick="pickStock(${s.id})">
+                <div><b>${s.brand} ${s.model}</b> <span style="color:var(--text-dim);font-size:12px;">· ${s.name}</span></div>
+                <div style="text-align:right;flex-shrink:0;margin-left:10px;">
+                    <div style="color:var(--primary);font-weight:700;">₹${s.buy} CP${s.sell ? ` · <span style="color:var(--accent)">₹${s.sell} SP</span>` : ''}</div>
+                    <div style="font-size:11px;color:${qColor};font-weight:700;">Qty: ${s.qty}${s.qty<=2?' ⚠':''}</div>
+                </div>
+            </div>`;
+        }).join('');
+        box.classList.add('open');
+    }
 }
 
 function pickStock(id) {
@@ -1176,6 +1230,447 @@ function pickStock(id) {
     document.getElementById('bPrice').focus();
 }
 
+// ===================== BRAND / MODEL DATABASE =====================
+const BRAND_MODELS = {
+    'Samsung': [
+        'Galaxy A03','Galaxy A03s','Galaxy A04','Galaxy A04e','Galaxy A04s',
+        'Galaxy A05','Galaxy A05s','Galaxy A06','Galaxy A06 5G',
+        'Galaxy A12','Galaxy A13','Galaxy A13 5G','Galaxy A14','Galaxy A14 5G',
+        'Galaxy A15','Galaxy A15 5G','Galaxy A16','Galaxy A16 5G',
+        'Galaxy A22','Galaxy A22 5G','Galaxy A23','Galaxy A23 5G',
+        'Galaxy A24','Galaxy A25','Galaxy A25 5G','Galaxy A26 5G',
+        'Galaxy A32','Galaxy A32 5G','Galaxy A33','Galaxy A33 5G',
+        'Galaxy A34','Galaxy A34 5G','Galaxy A35','Galaxy A35 5G',
+        'Galaxy A52','Galaxy A52 5G','Galaxy A52s','Galaxy A53','Galaxy A53 5G',
+        'Galaxy A54','Galaxy A54 5G','Galaxy A55','Galaxy A55 5G','Galaxy A56 5G',
+        'Galaxy A72','Galaxy A73','Galaxy A73 5G',
+        'Galaxy M02','Galaxy M02s','Galaxy M04','Galaxy M04e',
+        'Galaxy M12','Galaxy M13','Galaxy M13 5G','Galaxy M14','Galaxy M14 5G',
+        'Galaxy M15','Galaxy M15 5G','Galaxy M16 5G',
+        'Galaxy M21','Galaxy M22','Galaxy M23','Galaxy M23 5G',
+        'Galaxy M24','Galaxy M32','Galaxy M32 5G','Galaxy M33','Galaxy M33 5G',
+        'Galaxy M34','Galaxy M34 5G','Galaxy M35','Galaxy M35 5G',
+        'Galaxy M42','Galaxy M52','Galaxy M53','Galaxy M54','Galaxy M54 5G',
+        'Galaxy M55','Galaxy M55 5G',
+        'Galaxy F02s','Galaxy F04','Galaxy F05','Galaxy F12','Galaxy F13',
+        'Galaxy F14','Galaxy F14 5G','Galaxy F15','Galaxy F15 5G',
+        'Galaxy F22','Galaxy F23','Galaxy F23 5G',
+        'Galaxy F34','Galaxy F34 5G','Galaxy F35','Galaxy F35 5G',
+        'Galaxy F42','Galaxy F54','Galaxy F54 5G','Galaxy F55','Galaxy F55 5G',
+        'Galaxy S21','Galaxy S21+','Galaxy S21 Ultra','Galaxy S21 FE',
+        'Galaxy S22','Galaxy S22+','Galaxy S22 Ultra',
+        'Galaxy S23','Galaxy S23+','Galaxy S23 Ultra','Galaxy S23 FE',
+        'Galaxy S24','Galaxy S24+','Galaxy S24 Ultra','Galaxy S24 FE',
+        'Galaxy S25','Galaxy S25+','Galaxy S25 Ultra',
+        'Galaxy Note 20','Galaxy Note 20 Ultra',
+        'Galaxy Z Fold 5','Galaxy Z Fold 6','Galaxy Z Flip 5','Galaxy Z Flip 6',
+    ],
+    'Vivo': [
+        'Y01','Y01A','Y02','Y02A','Y02T','Y03','Y03s','Y03T',
+        'Y11','Y11s','Y12','Y12s','Y12G','Y15','Y15A','Y15s',
+        'Y16','Y16s','Y17s','Y18','Y18e','Y18L','Y18T',
+        'Y19s','Y20','Y20A','Y20G','Y20i','Y20s',
+        'Y21','Y21A','Y21e','Y21G','Y21L','Y21s','Y21T',
+        'Y22','Y22s','Y23','Y25','Y26','Y27','Y27s','Y27 5G',
+        'Y28','Y28 5G','Y28e 5G','Y29','Y29 5G','Y29s',
+        'Y30','Y30 5G','Y30i','Y31','Y31s','Y33','Y33e','Y33s','Y33T',
+        'Y35','Y35 5G','Y36','Y36 5G','Y38','Y38 5G',
+        'Y50','Y51','Y51A','Y52','Y52s','Y53','Y53s',
+        'Y55','Y55s','Y55 5G','Y56','Y56 5G','Y57','Y58',
+        'Y65','Y66','Y67','Y71','Y72','Y72 5G','Y73','Y73s',
+        'Y74s','Y75','Y75 5G','Y76','Y76 5G','Y77','Y77 5G',
+        'Y78','Y78 5G','Y81','Y81i','Y83','Y83 Pro','Y85','Y91','Y91i','Y93','Y95',
+        'T1','T1 5G','T1x','T1 Pro','T2','T2 5G','T2x','T2x 5G','T2 Pro',
+        'T3','T3 5G','T3x','T3 5G Lite','T3 Lite 5G','T3 Pro','T3 Ultra',
+        'V15','V15 Pro','V17','V17 Pro','V19','V19 Pro',
+        'V20','V20 Pro','V20 SE','V21','V21 5G','V21e','V21s',
+        'V23','V23 5G','V23e','V23 Pro',
+        'V25','V25 5G','V25e','V25 Pro',
+        'V27','V27 5G','V27e','V27 Pro',
+        'V29','V29 5G','V29e','V29 Pro',
+        'V30','V30 5G','V30e','V30 Lite','V30 Pro',
+        'V40','V40 5G','V40e','V40 Lite','V40 Pro',
+        'iQOO Z3','iQOO Z5','iQOO Z6','iQOO Z6 Lite','iQOO Z6 Pro',
+        'iQOO Z7','iQOO Z7 Pro','iQOO Z7s','iQOO Z7x',
+        'iQOO Z9','iQOO Z9 Lite','iQOO Z9 Pro','iQOO Z9 Turbo','iQOO Z9x',
+        'iQOO Neo 6','iQOO Neo 7','iQOO Neo 7 Pro','iQOO Neo 8','iQOO Neo 8 Pro',
+        'iQOO Neo 9','iQOO Neo 9 Pro',
+        'iQOO 11','iQOO 11 Pro','iQOO 12','iQOO 12 Pro',
+    ],
+    'Oppo': [
+        'A1','A1 Pro','A1k','A2','A2 Pro','A2m','A2x',
+        'A3','A3 Pro','A3s','A3x','A5','A5 2020','A5s','A5x',
+        'A7','A7x','A9','A9 2020','A11','A11k','A11s',
+        'A12','A12e','A12s','A15','A15s',
+        'A16','A16e','A16k','A16s','A17','A17k','A18','A18 5G',
+        'A31','A32','A33','A35','A36','A37','A38','A38 5G',
+        'A52','A53','A53s','A54','A54s','A55','A55s','A56 5G',
+        'A57','A57 4G','A57s','A58','A58 5G','A59','A59 5G',
+        'A60','A60 5G','A61','A62','A63',
+        'A74','A74 5G','A75','A76','A77','A77 5G','A77s',
+        'A78','A78 5G','A79','A79 5G','A80 5G',
+        'A91','A92','A93','A94','A94 5G','A95','A96',
+        'F1s','F3','F3 Plus','F5','F7','F9','F9 Pro',
+        'F11','F11 Pro','F15','F15 Pro','F17','F17 Pro',
+        'F19','F19 Pro','F19 Pro+','F19s',
+        'F21 Pro','F21 Pro 5G','F21s Pro',
+        'F23','F23 5G','F25 Pro','F25 Pro 5G',
+        'F27','F27 Pro','F27 Pro+',
+        'Reno 2','Reno 2F','Reno 2Z',
+        'Reno 3','Reno 3 Pro','Reno 4','Reno 4 Pro','Reno 4F',
+        'Reno 5','Reno 5 Pro','Reno 5F','Reno 5 Lite',
+        'Reno 6','Reno 6 Pro','Reno 6 Pro+','Reno 6 Lite','Reno 6Z',
+        'Reno 7','Reno 7 Pro','Reno 7 Lite','Reno 7Z',
+        'Reno 8','Reno 8 Pro','Reno 8 Pro+','Reno 8T','Reno 8Z',
+        'Reno 9','Reno 9 Pro','Reno 9 Pro+',
+        'Reno 10','Reno 10 Pro','Reno 10 Pro+','Reno 10 5G',
+        'Reno 11','Reno 11 Pro','Reno 11 5G','Reno 11F',
+        'Reno 12','Reno 12 Pro','Reno 12F',
+    ],
+    'Realme': [
+        'C1','C2','C3','C11','C11 2021','C12','C15','C17',
+        'C20','C20A','C21','C21s','C21Y','C21 5G',
+        'C25','C25s','C25Y','C25 5G',
+        'C30','C30s','C31','C33','C33 2023','C35',
+        'C51','C51 5G','C53','C53 5G','C55','C55 5G',
+        'C61','C61 5G','C63','C63 5G','C65','C65 5G','C67','C67 5G',
+        'C71','C75',
+        '5','5 Pro','5s','5i','6','6 Pro','6i','6s',
+        '7','7 Pro','7i','7s',
+        '8','8 Pro','8 5G','8i','8s',
+        '9','9 Pro','9 Pro+','9 SE','9i','9 5G',
+        '10','10 Pro','10 Pro+','10 5G','10s',
+        '11','11 Pro','11 Pro+','11 5G','11x','11x 5G',
+        '12','12 Pro','12 Pro+','12 5G','12x','12x 5G','12 Lite',
+        '13','13 Pro','13 Pro+','13 5G','13x',
+        'GT','GT Neo','GT Neo 2','GT Neo 3','GT Neo 3T','GT Neo 5','GT Neo 6',
+        'GT 2','GT 2 Pro','GT 3','GT 5','GT 5 Pro',
+        'GT 6','GT 6T','GT 7 Pro',
+        'GT Master','GT Master Explorer',
+        'Narzo 10','Narzo 10A','Narzo 20','Narzo 20A','Narzo 20 Pro',
+        'Narzo 30','Narzo 30 5G','Narzo 30A','Narzo 30 Pro',
+        'Narzo 50','Narzo 50 5G','Narzo 50A','Narzo 50A Prime','Narzo 50 Pro',
+        'Narzo 50i','Narzo 50i Prime',
+        'Narzo 60','Narzo 60 5G','Narzo 60 Pro','Narzo 60x',
+        'Narzo 70','Narzo 70 5G','Narzo 70 Pro','Narzo 70x',
+        'Narzo 70 Curve','Narzo 70 Turbo',
+    ],
+    'Redmi': [
+        'A1','A1+','A2','A2+','A3','A3 Pro','A4','A4 5G',
+        '6','6A','6 Pro','7','7A','7 Pro',
+        '8','8A','8A Dual','8A Pro',
+        '9','9A','9A Sport','9B','9C','9i','9i Sport','9 Prime','9 Power',
+        '10','10A','10A Sport','10C','10 Prime','10 Prime+','10 Power',
+        '11','11A','11 Prime','11 Prime 5G','11 Prime+ 5G',
+        '12','12 5G','12B','12C','12R',
+        '13','13 5G','13C','13C 5G',
+        '14','14C','14C 5G',
+        'Note 5','Note 5 Pro','Note 5A',
+        'Note 6','Note 6 Pro','Note 7','Note 7 Pro','Note 7S',
+        'Note 8','Note 8 Pro','Note 8T','Note 8 2021',
+        'Note 9','Note 9 Pro','Note 9 Pro Max','Note 9S','Note 9T',
+        'Note 10','Note 10 Pro','Note 10 Pro Max','Note 10 Lite','Note 10S','Note 10T 5G',
+        'Note 11','Note 11 Pro','Note 11 Pro+','Note 11 Pro 5G','Note 11S','Note 11T 5G','Note 11 SE',
+        'Note 12','Note 12 Pro','Note 12 Pro+','Note 12 Pro 5G','Note 12 Turbo','Note 12S','Note 12R','Note 12 5G',
+        'Note 13','Note 13 Pro','Note 13 Pro+','Note 13 Pro 5G','Note 13 5G','Note 13R','Note 13 4G',
+        'Note 14','Note 14 Pro','Note 14 Pro+','Note 14 5G','Note 14 Pro 5G',
+        'POCO C31','POCO C40','POCO C50','POCO C51','POCO C55','POCO C61','POCO C65',
+        'POCO M2','POCO M2 Pro','POCO M3','POCO M3 Pro','POCO M3 Pro 5G',
+        'POCO M4','POCO M4 Pro','POCO M4 Pro 5G','POCO M4 5G',
+        'POCO M5','POCO M5s','POCO M6','POCO M6 Pro','POCO M6 Pro 5G','POCO M6 5G',
+        'POCO X2','POCO X3','POCO X3 Pro','POCO X4','POCO X4 Pro','POCO X4 Pro 5G',
+        'POCO X5','POCO X5 Pro','POCO X5 Pro 5G',
+        'POCO X6','POCO X6 Pro','POCO X6 Neo',
+        'POCO F3','POCO F4','POCO F4 GT','POCO F5','POCO F5 Pro',
+        'POCO F6','POCO F6 Pro',
+    ],
+    'iPhone': [
+        'iPhone 5s','iPhone 6','iPhone 6 Plus',
+        'iPhone 6s','iPhone 6s Plus',
+        'iPhone 7','iPhone 7 Plus',
+        'iPhone 8','iPhone 8 Plus',
+        'iPhone X','iPhone XR','iPhone XS','iPhone XS Max',
+        'iPhone 11','iPhone 11 Pro','iPhone 11 Pro Max',
+        'iPhone 12','iPhone 12 Mini','iPhone 12 Pro','iPhone 12 Pro Max',
+        'iPhone 13','iPhone 13 Mini','iPhone 13 Pro','iPhone 13 Pro Max',
+        'iPhone 14','iPhone 14 Plus','iPhone 14 Pro','iPhone 14 Pro Max',
+        'iPhone 15','iPhone 15 Plus','iPhone 15 Pro','iPhone 15 Pro Max',
+        'iPhone 16','iPhone 16 Plus','iPhone 16 Pro','iPhone 16 Pro Max',
+        'iPhone SE (1st gen)','iPhone SE (2nd gen)','iPhone SE (3rd gen)',
+    ],
+    'OnePlus': [
+        'One','2','3','3T','5','5T','6','6T',
+        '7','7 Pro','7T','7T Pro',
+        '8','8 Pro','8T','9','9 Pro','9R','9RT',
+        '10','10 Pro','10R','10T',
+        '11','11 5G','11R','12','12R','12 5G',
+        'Nord','Nord 2','Nord 2T','Nord 2 5G',
+        'Nord 3','Nord 3 5G','Nord 4',
+        'Nord CE','Nord CE 2','Nord CE 2 Lite','Nord CE 2 5G',
+        'Nord CE 3','Nord CE 3 Lite','Nord CE 3 5G',
+        'Nord CE 4','Nord CE 4 Lite',
+        'Nord N10','Nord N20','Nord N30',
+        'Ace','Ace 2','Ace 2V','Ace 2 Pro',
+        'Ace 3','Ace 3V','Ace 3 Pro',
+    ],
+    'Mi': [
+        'Mi 9','Mi 9 Lite','Mi 9T','Mi 9T Pro',
+        'Mi 10','Mi 10 Lite','Mi 10 Pro','Mi 10T','Mi 10T Lite','Mi 10T Pro','Mi 10i',
+        'Mi 11','Mi 11 Lite','Mi 11 Lite 5G','Mi 11 Pro','Mi 11 Ultra','Mi 11X','Mi 11X Pro','Mi 11i',
+        'Mi 12','Mi 12 Lite','Mi 12 Pro','Mi 12T','Mi 12T Pro',
+        'Xiaomi 11i','Xiaomi 11i Hypercharge',
+        'Xiaomi 12','Xiaomi 12 Lite','Xiaomi 12 Pro','Xiaomi 12T','Xiaomi 12T Pro',
+        'Xiaomi 13','Xiaomi 13 Lite','Xiaomi 13 Pro','Xiaomi 13 Mini',
+        'Xiaomi 13C','Xiaomi 13T','Xiaomi 13T Pro','Xiaomi 13 Ultra',
+        'Xiaomi 14','Xiaomi 14 Pro','Xiaomi 14 Ultra','Xiaomi 14 Civi','Xiaomi 14T','Xiaomi 14T Pro',
+        'Xiaomi 15','Xiaomi 15 Pro','Xiaomi 15 Ultra',
+        'Mi A1','Mi A2','Mi A2 Lite','Mi A3',
+    ],
+    'Nokia': [
+        '1','1.3','1.4','2','2.2','2.3','2.4','2.5','2.6',
+        '3','3.1','3.1 Plus','3.2','3.4','3.5','3.6',
+        '4','4.2','5','5.1','5.1 Plus','5.3','5.4',
+        '6','6.1','6.1 Plus','6.2','7','7 Plus','7.1','7.2','7.3',
+        '8','8.1','8.3',
+        'C01 Plus','C02','C05','C1','C1 Plus','C12','C12 Pro',
+        'C20','C21','C21 Plus','C22','C23','C30','C31','C32',
+        'G10','G11','G11 Plus','G20','G21','G22','G42',
+        'X10','X20','X30',
+    ],
+    'Motorola': [
+        'Moto E6','Moto E6 Plus','Moto E7','Moto E7 Plus','Moto E7 Power',
+        'Moto E11','Moto E11 Plus','Moto E13','Moto E13 Power',
+        'Moto E20','Moto E22','Moto E22i','Moto E22s','Moto E22 Plus',
+        'Moto E30','Moto E32','Moto E32s','Moto E32 Power','Moto E40','Moto E42',
+        'Moto G04','Moto G04s','Moto G04 Power',
+        'Moto G05','Moto G05 Power',
+        'Moto G10','Moto G10 Power','Moto G14','Moto G14 Power',
+        'Moto G20','Moto G22','Moto G23',
+        'Moto G24','Moto G24 Power','Moto G24 5G',
+        'Moto G30','Moto G31','Moto G32','Moto G34','Moto G34 5G',
+        'Moto G40','Moto G41','Moto G42','Moto G50','Moto G51','Moto G52',
+        'Moto G53','Moto G53 5G','Moto G54','Moto G54 5G','Moto G54 Power',
+        'Moto G60','Moto G60s','Moto G62','Moto G62 5G',
+        'Moto G64','Moto G64 5G','Moto G71','Moto G71 5G',
+        'Moto G72','Moto G73','Moto G73 5G',
+        'Moto G82','Moto G84','Moto G84 5G','Moto G85','Moto G85 5G',
+        'Moto G200 5G',
+        'Moto Edge 20','Moto Edge 20 Lite','Moto Edge 20 Pro','Moto Edge 20 Fusion',
+        'Moto Edge 30','Moto Edge 30 Lite','Moto Edge 30 Fusion',
+        'Moto Edge 30 Neo','Moto Edge 30 Pro','Moto Edge 30 Ultra',
+        'Moto Edge 40','Moto Edge 40 Neo','Moto Edge 40 Pro','Moto Edge 40 Fusion',
+        'Moto Edge 50','Moto Edge 50 Fusion','Moto Edge 50 Neo',
+        'Moto Edge 50 Pro','Moto Edge 50 Ultra',
+        'Moto Razr 40','Moto Razr 40 Ultra','Moto Razr 50','Moto Razr 50 Ultra',
+    ],
+    'Infinix': [
+        'Hot 8','Hot 8 Lite','Hot 9','Hot 9 Play','Hot 9 Pro',
+        'Hot 10','Hot 10 Lite','Hot 10 Play','Hot 10 Pro','Hot 10s',
+        'Hot 11','Hot 11 2022','Hot 11 Play','Hot 11s','Hot 11s NFC',
+        'Hot 12','Hot 12i','Hot 12 Play','Hot 12 Pro',
+        'Hot 20','Hot 20i','Hot 20 Play','Hot 20s','Hot 20 5G','Hot 20 Pro',
+        'Hot 30','Hot 30i','Hot 30 Play','Hot 30 5G',
+        'Hot 40','Hot 40i','Hot 40 Pro','Hot 40 5G',
+        'Hot 50','Hot 50 Pro','Hot 50 5G',
+        'Note 8','Note 8 Pro','Note 10','Note 10 Pro',
+        'Note 11','Note 11 Pro','Note 11s',
+        'Note 12','Note 12 Pro','Note 12 Turbo','Note 12 VIP',
+        'Note 30','Note 30 5G','Note 30 Pro','Note 30 VIP','Note 30i',
+        'Note 40','Note 40 Pro','Note 40 Pro 5G','Note 40x',
+        'Smart 4','Smart 5','Smart 6','Smart 6 HD','Smart 6 Plus',
+        'Smart 7','Smart 7 HD','Smart 7 Plus',
+        'Smart 8','Smart 8 HD','Smart 8 Plus',
+        'Zero 20','Zero 30','Zero 30 5G',
+        'Zero 40','Zero 40 5G',
+        'GT 10 Pro','GT 20 Pro','GT Neo','GT Neo 2',
+    ],
+    'Tecno': [
+        'Camon 12','Camon 12 Pro','Camon 15','Camon 15 Pro',
+        'Camon 16','Camon 16 Premier','Camon 17','Camon 17 Pro',
+        'Camon 18','Camon 18 Premier',
+        'Camon 19','Camon 19 Neo','Camon 19 Pro',
+        'Camon 20','Camon 20 Pro','Camon 20 Pro 5G','Camon 20 Premier 5G',
+        'Camon 30','Camon 30 5G','Camon 30 Premier 5G','Camon 30 Pro',
+        'Spark 6','Spark 6 Air','Spark 6 Go','Spark 6 Pro',
+        'Spark 7','Spark 7P','Spark 7T',
+        'Spark 8','Spark 8C','Spark 8P','Spark 8 Pro',
+        'Spark 9','Spark 9 Pro','Spark 9T',
+        'Spark 10','Spark 10 Pro','Spark 10C','Spark 10 5G',
+        'Spark 20','Spark 20 Pro','Spark 20C','Spark 20 Pro+',
+        'Spark 30','Spark 30C','Spark 30 Pro',
+        'Pova','Pova 2','Pova 3','Pova 4','Pova 4 Pro',
+        'Pova 5','Pova 5 Pro','Pova 6 Neo','Pova 6 Pro',
+        'Pop 4','Pop 4 Pro','Pop 5','Pop 5 Pro',
+        'Pop 6','Pop 6 Pro','Pop 7','Pop 7 Pro','Pop 8',
+        'Phantom X','Phantom X2','Phantom X2 Pro',
+    ],
+    'Lava': [
+        'Z1','Z2','Z2 Max','Z2s','Z3','Z4','Z6','Z7','Z9',
+        'Blaze','Blaze 2','Blaze 2 5G','Blaze Pro','Blaze X',
+        'Blaze Curve','Blaze NXT','Blaze Wool',
+        'X2','X2 Max','X3','X3 Pro','X4',
+        'Agni','Agni 2','Agni 2 5G',
+        'Storm 5G','Storm Pro',
+        'Yuva 2','Yuva 2 Pro','Yuva 3','Yuva 3 Pro',
+    ],
+    'boAt': [
+        'Airdopes 131','Airdopes 141','Airdopes 161','Airdopes 171',
+        'Airdopes 181','Airdopes 191','Airdopes 281','Airdopes 311 Pro',
+        'Airdopes 381','Airdopes 441','Airdopes 461','Airdopes 471 v2',
+        'Airdopes 511v2','Airdopes 621',
+        'Airdopes 131 Pro','Airdopes 141 Pro',
+        'Rockerz 255','Rockerz 255 Pro','Rockerz 333','Rockerz 450','Rockerz 480',
+        'Rockerz 510','Rockerz 550','Rockerz 555 Pro','Rockerz 558','Rockerz 600',
+        'Bassheads 100','Bassheads 152','Bassheads 900',
+        'Stone 200','Stone 352','Stone 650','Stone 1000',
+        'Xtend','Xtend Pro',
+        'Watch Enigma','Watch Vertex','Watch Flash','Watch Dizo',
+    ],
+};
+
+const BRAND_ALIASES = {
+    'samsung': 'Samsung', 'sam': 'Samsung', 'ss': 'Samsung', 'galaxy': 'Samsung',
+    'vivo': 'Vivo', 'vi': 'Vivo',
+    'oppo': 'Oppo', 'op': 'Oppo',
+    'realme': 'Realme', 'real': 'Realme', 'rm': 'Realme', 're': 'Realme',
+    'redmi': 'Redmi', 'red': 'Redmi', 'xiao': 'Redmi', 'xiaomi': 'Redmi', 'poco': 'Redmi',
+    'iphone': 'iPhone', 'apple': 'iPhone', 'ip': 'iPhone', 'ios': 'iPhone',
+    'oneplus': 'OnePlus', 'one': 'OnePlus', '1+': 'OnePlus',
+    'mi': 'Mi', 'xia': 'Mi',
+    'nokia': 'Nokia', 'nok': 'Nokia',
+    'motorola': 'Motorola', 'moto': 'Motorola', 'mot': 'Motorola',
+    'infinix': 'Infinix', 'inf': 'Infinix',
+    'tecno': 'Tecno', 'tec': 'Tecno',
+    'lava': 'Lava', 'lav': 'Lava',
+    'boat': 'boAt', 'boa': 'boAt',
+};
+
+// ── Billing: Brand autocomplete ──
+function brandSuggest(q) {
+    const box = document.getElementById('brandResults');
+    if (!box) return;
+    const allBrands = Object.keys(BRAND_MODELS);
+    const matches = !q.trim()
+        ? allBrands
+        : allBrands.filter(b => b.toLowerCase().startsWith(q.toLowerCase()) || b.toLowerCase().includes(q.toLowerCase()));
+    if (!matches.length) { box.style.display = 'none'; return; }
+    box.innerHTML = matches.map(b =>
+        `<div class="search-item" onclick="pickBrand('${b}')" style="font-weight:700;font-size:13px;">📱 ${b}</div>`
+    ).join('');
+    box.style.display = 'block';
+}
+
+function pickBrand(brand) {
+    document.getElementById('bBrand').value = brand;
+    document.getElementById('brandResults').style.display = 'none';
+    document.getElementById('bModel').value = '';
+    document.getElementById('bModel').focus();
+    modelSuggest('');
+}
+
+// ── Billing: Model autocomplete ──
+function modelSuggest(q) {
+    const box = document.getElementById('modelResults');
+    if (!box) return;
+    let brand = document.getElementById('bBrand').value.trim();
+    const alias = BRAND_ALIASES[brand.toLowerCase()];
+    if (alias) brand = alias;
+    const models = BRAND_MODELS[brand] || [];
+    if (!models.length) { box.style.display = 'none'; return; }
+    const matches = !q.trim() ? models : models.filter(m => m.toLowerCase().includes(q.toLowerCase()));
+    if (!matches.length) { box.style.display = 'none'; return; }
+    box.innerHTML = matches.map(m =>
+        `<div class="search-item" onclick="pickModel('${m.replace(/'/g,"\\'")}')">
+            <span style="font-size:13px;">${m}</span>
+        </div>`
+    ).join('');
+    box.style.display = 'block';
+}
+
+function pickModel(model) {
+    document.getElementById('bModel').value = model;
+    document.getElementById('modelResults').style.display = 'none';
+    document.getElementById('bItem').focus();
+}
+
+// ── Stock tab: Brand autocomplete ──
+function sBrandSuggest(q) {
+    const box = document.getElementById('sBrandResults');
+    if (!box) return;
+    const allBrands = Object.keys(BRAND_MODELS);
+    const matches = !q.trim()
+        ? allBrands
+        : allBrands.filter(b => b.toLowerCase().startsWith(q.toLowerCase()) || b.toLowerCase().includes(q.toLowerCase()));
+    if (!matches.length) { box.style.display = 'none'; return; }
+    box.innerHTML = matches.map(b =>
+        `<div class="search-item" onclick="pickSBrand('${b}')" style="font-weight:700;font-size:13px;">📱 ${b}</div>`
+    ).join('');
+    box.style.display = 'block';
+}
+
+function pickSBrand(brand) {
+    document.getElementById('sBrand').value = brand;
+    document.getElementById('sBrandResults').style.display = 'none';
+    document.getElementById('sModel').value = '';
+    document.getElementById('sModel').focus();
+    sModelSuggest('');
+}
+
+// ── Stock tab: Model autocomplete ──
+function sModelSuggest(q) {
+    const box = document.getElementById('sModelResults');
+    if (!box) return;
+    let brand = document.getElementById('sBrand').value.trim();
+    const alias = BRAND_ALIASES[brand.toLowerCase()];
+    if (alias) brand = alias;
+    const models = BRAND_MODELS[brand] || [];
+    if (!models.length) { box.style.display = 'none'; return; }
+    const matches = !q.trim() ? models : models.filter(m => m.toLowerCase().includes(q.toLowerCase()));
+    if (!matches.length) { box.style.display = 'none'; return; }
+    box.innerHTML = matches.map(m =>
+        `<div class="search-item" onclick="pickSModel('${m.replace(/'/g,"\\'")}')">
+            <span style="font-size:13px;">${m}</span>
+        </div>`
+    ).join('');
+    box.style.display = 'block';
+}
+
+function pickSModel(model) {
+    document.getElementById('sModel').value = model;
+    document.getElementById('sModelResults').style.display = 'none';
+    document.getElementById('sName').focus();
+}
+
+// ===================== CUSTOMER NAME AUTOCOMPLETE IN BILLING =====================
+function customerNameSearch(q) {
+    const box = document.getElementById('custNameResults');
+    if (!box) return;
+    const matches = customers.filter(c =>
+        !q.trim() ? true : (c.name.toLowerCase().includes(q.toLowerCase()) || c.phone.includes(q))
+    ).slice(0, 8);
+    if (!matches.length) { box.style.display = 'none'; return; }
+    box.innerHTML = matches.map(c => `
+        <div class="search-item" onclick="pickCustomerForBill('${c.id}')">
+            <div>
+                <div style="font-weight:700;font-size:13px;">👤 ${c.name}</div>
+                <div style="font-size:11px;color:var(--text-dim);">📞 ${c.phone}${c.area ? ' · 📍 '+c.area : ''}</div>
+            </div>
+            <span style="font-size:11px;background:var(--primary-dim);color:var(--primary);padding:2px 8px;border-radius:12px;white-space:nowrap;">${c.type||'Regular'}</span>
+        </div>
+    `).join('');
+    box.style.display = 'block';
+}
+
+function pickCustomerForBill(id) {
+    const c = customers.find(x => x.id === id);
+    if (!c) return;
+    document.getElementById('bName').value  = c.name;
+    document.getElementById('bPhone').value = c.phone;
+    document.getElementById('custNameResults').style.display = 'none';
+    document.getElementById('bSearch').focus();
+    toast(`👤 ${c.name} selected!`);
+}
+
 function clearStockPick() {
     document.getElementById('bStockId').value = '';
     document.getElementById('stockChip').classList.add('hidden');
@@ -1188,6 +1683,31 @@ document.addEventListener('click', function(e) {
     const res = document.getElementById('searchResults');
     const inp = document.getElementById('bSearch');
     if(!res.contains(e.target) && e.target !== inp) res.classList.remove('open');
+
+    // Close customer name dropdown
+    const cRes = document.getElementById('custNameResults');
+    const cInp = document.getElementById('bName');
+    if(cRes && cInp && !cRes.contains(e.target) && e.target !== cInp) cRes.style.display = 'none';
+
+    // Close brand dropdown
+    const bRes = document.getElementById('brandResults');
+    const bInp = document.getElementById('bBrand');
+    if(bRes && bInp && !bRes.contains(e.target) && e.target !== bInp) bRes.style.display = 'none';
+
+    // Close model dropdown
+    const mRes = document.getElementById('modelResults');
+    const mInp = document.getElementById('bModel');
+    if(mRes && mInp && !mRes.contains(e.target) && e.target !== mInp) mRes.style.display = 'none';
+
+    // Close STOCK brand dropdown
+    const sbRes = document.getElementById('sBrandResults');
+    const sbInp = document.getElementById('sBrand');
+    if(sbRes && sbInp && !sbRes.contains(e.target) && e.target !== sbInp) sbRes.style.display = 'none';
+
+    // Close STOCK model dropdown
+    const smRes = document.getElementById('sModelResults');
+    const smInp = document.getElementById('sModel');
+    if(smRes && smInp && !smRes.contains(e.target) && e.target !== smInp) smRes.style.display = 'none';
 });
 
 // Show auto-stock notice when typing manual item
